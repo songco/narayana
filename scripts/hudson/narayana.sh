@@ -316,29 +316,22 @@ function build_as {
   git pull --rebase --ff-only upstream master
   [ $? = 0 ] || fatal "git rebase failed"
 
+  if [ $JAVA_VERSION = "9-ea" ]; then
+     # build openjdk-orb with fixing the reflect issue
+     build_openjdk_orb
+     # replace the openjdk-orb with the 8.0.8.Beta1-SNAPSHOT
+     sed -i s/8.0.7.Final/8.0.8.Beta1-SNAPSHOT/g pom.xml
+  fi
+
   export MAVEN_OPTS="-XX:MaxPermSize=512m -XX:+UseConcMarkSweepGC $MAVEN_OPTS"
   if [ $AS_TESTS = 1 ]; then
-    JAVA_OPTS="-Xms1303m -Xmx1303m -XX:MaxPermSize=512m $JAVA_OPTS" 
     JAVA_OPTS="$JAVA_OPTS -Xms1303m -Xmx1303m -XX:MaxPermSize=512m" ./build.sh clean install -Dlicense.skipDownloadLicenses=true $IPV6_OPTS -Drelease=true -Dversion.org.jboss.narayana=5.6.0.Final-SNAPSHOT
     [ $? = 0 ] || fatal "AS build failed"
 
     ./build.sh -f testsuite/pom.xml -DallTests=true $IPV6_OPTS -Dversion.org.jboss.narayana=5.6.0.Final-SNAPSHOT
     [ $? = 0 ] || fatal "AS testsuite build failed"
   else
-    if [ $JAVA_VERSION = "9-ea" ]; then
-      # build openjdk-orb with fixing the reflect issue
-      build_openjdk_orb
-
-      # replace the openjdk-orb with the 8.0.8.Beta1-SNAPSHOT
-      sed -i s/8.0.6.Final/8.0.8.Beta1-SNAPSHOT/g pom.xml
-
-      export MAVEN_OPTS="--add-exports java.xml/com.sun.xml.internal.stream=ALL-UNNAMED --add-opens java.base/java.securi=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED $MAVEN_OPTS"
-      # j9 TODO enforcer.BanTransitiveDependencies fails for narayana-jts-integration (skip-enforce)
-      JAVA_OPTS="-Xms1303m -Xmx1303m $JAVA_OPTS" ./build.sh clean install -Dskip-enforce -DskipTests -Dts.smoke=false -Dlicense.skipDownloadLicenses=true $IPV6_OPTS -Drelease=true -Dversion.org.jboss.narayana=5.6.0.Final-SNAPSHOT
-    else
-      export MAVEN_OPTS="-XX:MaxPermSize=512m -XX:+UseConcMarkSweepGC $MAVEN_OPTS"
-      JAVA_OPTS="-Xms1303m -Xmx1303m -XX:MaxPermSize=512m $JAVA_OPTS" ./build.sh clean install -DskipTests -Dts.smoke=false -Dlicense.skipDownloadLicenses=true $IPV6_OPTS -Drelease=true -Dversion.org.jboss.narayana=5.6.0.Final-SNAPSHOT
-    fi
+     JAVA_OPTS="-Xms1303m -Xmx1303m -XX:MaxPermSize=512m $JAVA_OPTS" ./build.sh clean install -DskipTests -Dts.smoke=false -Dlicense.skipDownloadLicenses=true $IPV6_OPTS -Drelease=true -Dversion.org.jboss.narayana=5.6.0.Final-SNAPSHOT
   fi
   [ $? = 0 ] || fatal "AS build failed"
   
@@ -744,14 +737,14 @@ function qa_tests_once {
       if [[ -n "$QA_STRESS" ]] ; then
         for i in `seq 1 $QA_STRESS`; do
           echo run $i;
-          ant -f run-tests.xml $QA_PROFILE -Dtest.name=$QA_TESTGROUP -Dtest.methods="$QA_TESTMETHODS" onetest -Dcode.coverage=$codeCoverage;
+          ant -f run-tests.xml $QA_PROFILE -Dtest.name=$QA_TESTGROUP -Dtest.methods="$QA_TESTMETHODS" onetest -Dcode.coverage=$codeCoverage -Dorbtype=$orbtype;
           if [ $? -ne 0 ]; then
             ok=1; break;
           fi
         done
       else
         for testgroup in $QA_TESTGROUP; do
-          ant -f run-tests.xml $QA_PROFILE -Dtest.name=$testgroup -Dtest.methods="$QA_TESTMETHODS" onetest -Dcode.coverage=$codeCoverage;
+          ant -f run-tests.xml $QA_PROFILE -Dtest.name=$testgroup -Dtest.methods="$QA_TESTMETHODS" onetest -Dcode.coverage=$codeCoverage -Dorbtype=$orbtype;
           if [ $? -ne 0 ]; then
             echo "test group $testgroup failed"
             ok=1;
@@ -759,7 +752,7 @@ function qa_tests_once {
         done
       fi
     else
-      ant -f run-tests.xml $target $QA_PROFILE -Dcode.coverage=$codeCoverage
+      ant -f run-tests.xml $target $QA_PROFILE -Dcode.coverage=$codeCoverage -Dorbtype=$orbtype
       ok=$?
     fi
 
