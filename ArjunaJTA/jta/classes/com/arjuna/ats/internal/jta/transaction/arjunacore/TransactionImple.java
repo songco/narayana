@@ -1703,6 +1703,10 @@ public class TransactionImple implements javax.transaction.Transaction,
 
         return Collections.EMPTY_MAP;
     }
+    
+    public void setAsyncAfterCompletion(){
+    	this._theTransaction.setAsyncAfterCompletion();
+    }
 
     protected com.arjuna.ats.arjuna.AtomicAction _theTransaction;
 

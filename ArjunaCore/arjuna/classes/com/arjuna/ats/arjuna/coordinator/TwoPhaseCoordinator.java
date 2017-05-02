@@ -405,6 +405,13 @@ public class TwoPhaseCoordinator extends BasicAction implements Reapable
 
     protected boolean asyncAfterCompletion(int myStatus, boolean report_heuristics) {
         boolean problem = false;
+        
+        if(runningSynchronizations==null){
+	        synchronized (_synchs) {
+	            synchronizationCompletionService = TwoPhaseCommitThreadPool.getNewCompletionService();
+	            runningSynchronizations = new ArrayList<Future<Boolean>>(_synchs.size());
+	        }
+        }
 
         // note there is no need to synchronize on _synchs since synchronizations cannot be registered once
         // the action has started to commit
@@ -500,7 +507,7 @@ public class TwoPhaseCoordinator extends BasicAction implements Reapable
 
                 if (_synchs == null) {
                     return !problem;
-                } else if (TxControl.asyncAfterSynch && _synchs.size() > 1) {
+                } else if ((TxControl.asyncAfterSynch || txLevelAsyncAfterSynch) && _synchs.size() > 1) {
                     problem = asyncAfterCompletion(myStatus, report_heuristics);
                 } else {
 					// afterCompletions should run in reverse order compared to
@@ -584,6 +591,10 @@ public class TwoPhaseCoordinator extends BasicAction implements Reapable
 
         return synchs;
     }
+    
+    public void setAsyncAfterCompletion(){
+    	txLevelAsyncAfterSynch = true;
+    }
 
     private SortedSet<SynchronizationRecord> _synchs;
     private List<Future<Boolean>> runningSynchronizations = null;
@@ -596,4 +607,5 @@ public class TwoPhaseCoordinator extends BasicAction implements Reapable
 
 	private boolean _beforeCalled = false;
 	private boolean _afterCalled = false;
+	private boolean txLevelAsyncAfterSynch = false;
 }
